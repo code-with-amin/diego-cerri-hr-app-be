@@ -10,10 +10,11 @@ import * as candidateService from './candidates.service';
 
 export async function create(req: Request, res: Response) {
   if (!req.file) {
-    throw ApiError.badRequest('Resume file (curriculo) is required.');
+    throw ApiError.badRequest('Resume file (resume) is required.');
   }
   const input = candidateFormSchema.parse(req.body);
-  const candidate = await candidateService.createCandidate(input, req.file);
+  const created = await candidateService.createCandidate(input, req.file);
+  const { resumeS3Key: _key, ...candidate } = created;
   res.status(201).json({ candidate });
 }
 

@@ -16,4 +16,4 @@ export const resumeUpload = multer({
     }
     cb(null, true);
   },
-}).single('curriculo');
+}).single('resume');

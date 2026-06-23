@@ -30,80 +30,80 @@ const optionalNumber = z.preprocess(
   z.number().optional(),
 );
 
-// Checkbox: present (truthy / "on" / "true") => true.
-const consentField = z.preprocess((val) => {
-  if (val === true) return true;
-  const s = String(val).toLowerCase();
-  return s === 'on' || s === 'true' || s === '1' || s === 'yes' || s === 'sim';
-}, z.literal(true, { errorMap: () => ({ message: 'Consent (consentimento) is required.' }) }));
-
 const optionalDate = z.preprocess(
   (val) => (val === '' || val == null ? undefined : new Date(String(val))),
   z.date().optional(),
 );
 
-/** Raw form input (Portuguese keys), validated. */
+/** Raw form input (English keys from the HTML form), validated. */
 export const candidateFormSchema = z.object({
-  nome: requiredString,
+  // Contact
+  name: requiredString,
   email: z.preprocess((v) => (v == null ? '' : String(v).trim()), z.string().email()),
-  telefone: requiredString,
-  cidade: requiredString,
+  phone: requiredString,
+  city: requiredString,
   linkedin: optionalString,
-  nascimento: optionalDate,
+  birthDate: optionalDate,
 
-  modalidade: toStringArray.refine((a) => a.length > 0, 'Select at least one modalidade.'),
-  horasDia: z.preprocess((v) => Number(v), z.number().int().min(1).max(12)),
-  regime: optionalString,
-  inicio: optionalString,
-  viagem: requiredString,
+  // Modality & availability
+  modality: toStringArray.refine((a) => a.length > 0, 'Select at least one modality.'),
+  hoursPerDay: z.preprocess((v) => Number(v), z.number().int().min(1).max(12)),
+  workMode: optionalString,
+  startAvailability: optionalString,
+  travel: requiredString,
 
-  areas: toStringArray.refine((a) => a.length > 0, 'Select at least one área.'),
-  softwares: optionalString,
-  senioridade: optionalString,
+  // Knowledge areas
+  areas: toStringArray.refine((a) => a.length > 0, 'Select at least one area.'),
+  software: optionalString,
+  seniority: optionalString,
 
-  trabalhosExecutados: requiredString,
-  trabalhosPode: optionalString,
-  anosExp: optionalNumber.refine((n) => n == null || (n >= 0 && n <= 60), 'anosExp out of range.'),
-
-  valorHora: z.preprocess((v) => Number(v), z.number().nonnegative()),
-  pretensaoMensal: optionalNumber.refine(
-    (n) => n == null || n >= 0,
-    'pretensaoMensal must be >= 0.',
+  // Experience
+  pastWork: requiredString,
+  potentialWork: optionalString,
+  yearsExperience: optionalNumber.refine(
+    (n) => n == null || (n >= 0 && n <= 60),
+    'yearsExperience out of range.',
   ),
-  observacoes: optionalString,
-  consentimento: consentField,
+
+  // Compensation & notes
+  hourlyRate: z.preprocess((v) => Number(v), z.number().nonnegative()),
+  monthlyExpectation: optionalNumber.refine(
+    (n) => n == null || n >= 0,
+    'monthlyExpectation must be >= 0.',
+  ),
+  notes: optionalString,
 });
 
 export type CandidateFormInput = z.infer<typeof candidateFormSchema>;
 
-/** Map validated Portuguese form input to Prisma `Candidate` create fields. */
+/** Map validated form input to Prisma `Candidate` create fields. */
 export function mapFormToCandidate(input: CandidateFormInput) {
   return {
-    name: input.nome,
+    name: input.name,
     email: input.email,
-    phone: input.telefone,
-    city: input.cidade,
+    phone: input.phone,
+    city: input.city,
     linkedinUrl: input.linkedin ?? null,
-    birthDate: input.nascimento ?? null,
+    birthDate: input.birthDate ?? null,
 
-    employmentTypes: input.modalidade,
-    hoursPerDay: input.horasDia,
-    workRegime: input.regime ?? null,
-    availabilityStart: input.inicio ?? null,
-    travelAvailability: input.viagem,
+    employmentTypes: input.modality,
+    hoursPerDay: input.hoursPerDay,
+    workRegime: input.workMode ?? null,
+    availabilityStart: input.startAvailability ?? null,
+    travelAvailability: input.travel,
 
     knowledgeAreas: input.areas,
-    softwareSkills: input.softwares ?? null,
-    seniority: input.senioridade ?? null,
+    softwareSkills: input.software ?? null,
+    seniority: input.seniority ?? null,
 
-    workDone: input.trabalhosExecutados,
-    workCapable: input.trabalhosPode ?? null,
-    yearsExperience: input.anosExp ?? null,
+    workDone: input.pastWork,
+    workCapable: input.potentialWork ?? null,
+    yearsExperience: input.yearsExperience ?? null,
 
-    hourlyRate: input.valorHora,
-    monthlyExpectation: input.pretensaoMensal ?? null,
-    observations: input.observacoes ?? null,
-    consent: input.consentimento,
+    hourlyRate: input.hourlyRate,
+    monthlyExpectation: input.monthlyExpectation ?? null,
+    observations: input.notes ?? null,
+    consent: true,
   };
 }
 

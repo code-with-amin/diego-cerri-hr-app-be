@@ -21,6 +21,12 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('*'),
 
   MAX_UPLOAD_MB: z.coerce.number().default(10),
+
+  // Set to true in development to skip real S3 uploads.
+  S3_SKIP: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
 });
 
 const parsed = envSchema.safeParse(process.env);

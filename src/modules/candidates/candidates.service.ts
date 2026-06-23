@@ -29,7 +29,6 @@ export async function createCandidate(input: CandidateFormInput, file: ResumeFil
         resumeContentType: file.mimetype,
         resumeSize: file.size,
       },
-      select: { id: true, name: true, email: true, status: true, createdAt: true },
     });
     return candidate;
   } catch (err) {

@@ -19,19 +19,23 @@ export function errorHandler(
 ) {
   // Zod validation errors -> 400 with field details
   if (err instanceof ZodError) {
+    const details = err.flatten().fieldErrors;
+    console.error(`[${req.method} ${req.path}] Validation error:`, JSON.stringify(details, null, 2));
     res.status(400).json({
-      error: { message: 'Validation failed', details: err.flatten().fieldErrors },
+      error: { message: 'Validation failed', details },
     });
     return;
   }
 
   // Multer upload errors (size limit, etc.) -> 400
   if (err instanceof MulterError) {
+    console.error(`[${req.method} ${req.path}] Upload error:`, err.message);
     res.status(400).json({ error: { message: `Upload error: ${err.message}` } });
     return;
   }
 
   if (err instanceof ApiError) {
+    console.error(`[${req.method} ${req.path}] ApiError ${err.statusCode}:`, err.message, err.details ?? '');
     res.status(err.statusCode).json({
       error: { message: err.message, ...(err.details ? { details: err.details } : {}) },
     });
@@ -40,6 +44,7 @@ export function errorHandler(
 
   // Unknown / unexpected
   req.log?.error({ err }, 'Unhandled error');
+  console.error(`[${req.method} ${req.path}] Unhandled error:`, err);
   const message =
     env.NODE_ENV === 'production' ? 'Internal server error' : (err as Error)?.message ?? 'Error';
   res.status(500).json({ error: { message } });
