@@ -1,0 +1,101 @@
+// Prisma schema — HR App backend
+// PostgreSQL database. Run `npm run prisma:migrate` to apply.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CandidateStatus {
+  NEW
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+/// Single HR manager account (seeded). Could grow to multi-admin later.
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  notes Note[]
+
+  @@map("admins")
+}
+
+/// A candidate submission from the public "Trabalhe Conosco" form.
+/// Form field keys (Portuguese) are mapped to these columns in candidates.schema.ts.
+model Candidate {
+  id String @id @default(uuid())
+
+  // Contact — Informações de Contato
+  name        String    @map("name") // nome
+  email       String    @map("email") // email
+  phone       String    @map("phone") // telefone
+  city        String    @map("city") // cidade
+  linkedinUrl String?   @map("linkedin_url") // linkedin
+  birthDate   DateTime? @map("birth_date") @db.Date // nascimento
+
+  // Resume — Currículo (PDF) stored in S3
+  resumeS3Key       String  @map("resume_s3_key")
+  resumeFilename    String  @map("resume_filename")
+  resumeContentType String  @map("resume_content_type")
+  resumeSize        Int     @map("resume_size")
+
+  // Modality & availability — Modalidade e Disponibilidade
+  employmentTypes    String[] @map("employment_types") // modalidade
+  hoursPerDay        Int      @map("hours_per_day") // horasDia
+  workRegime         String?  @map("work_regime") // regime
+  availabilityStart  String?  @map("availability_start") // inicio
+  travelAvailability String   @map("travel_availability") // viagem
+
+  // Knowledge areas — Áreas de Conhecimento
+  knowledgeAreas String[] @map("knowledge_areas") // areas
+  softwareSkills String?  @map("software_skills") // softwares
+  seniority      String?  @map("seniority") // senioridade
+
+  // Experience — Experiência e Capacidades
+  workDone        String  @map("work_done") // trabalhosExecutados
+  workCapable     String? @map("work_capable") // trabalhosPode
+  yearsExperience Int?    @map("years_experience") // anosExp
+
+  // Compensation & notes — Remuneração e Observações
+  hourlyRate         Decimal  @map("hourly_rate") @db.Decimal(12, 2) // valorHora
+  monthlyExpectation Decimal? @map("monthly_expectation") @db.Decimal(12, 2) // pretensaoMensal
+  observations       String?  @map("observations") // observacoes
+  consent            Boolean  @map("consent") // consentimento
+  consentAt          DateTime @default(now()) @map("consent_at")
+
+  // Review workflow
+  status CandidateStatus @default(NEW)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  notes Note[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("candidates")
+}
+
+/// Private internal HR note attached to a candidate. Visible only to admins.
+model Note {
+  id          String   @id @default(uuid())
+  candidateId String   @map("candidate_id")
+  adminId     String   @map("admin_id")
+  body        String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  admin     Admin     @relation(fields: [adminId], references: [id])
+
+  @@index([candidateId])
+  @@map("notes")
+}
