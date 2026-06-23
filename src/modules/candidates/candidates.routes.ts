@@ -13,6 +13,14 @@ candidatesRouter.post(
   '/',
   submissionLimiter,
   resumeUpload,
+  (req, _res, next) => {
+    console.log(
+      '[POST /api/candidates] file:',
+      req.file ? `${req.file.originalname} (${req.file.mimetype}, ${req.file.size}B)` : 'MISSING',
+      '| body:', req.body,
+    );
+    next();
+  },
   asyncHandler(candidateController.create),
 );
 

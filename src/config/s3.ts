@@ -23,6 +23,10 @@ export interface UploadParams {
 
 /** Upload a private object to the resumes bucket. */
 export async function uploadObject({ key, body, contentType }: UploadParams): Promise<void> {
+  if (env.S3_SKIP) {
+    console.warn(`[S3_SKIP] Skipping upload: ${key} (${contentType}, ${body.length} bytes)`);
+    return;
+  }
   await s3.send(
     new PutObjectCommand({
       Bucket: env.S3_BUCKET,
@@ -53,7 +57,11 @@ export async function getResumeUrl(
   return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
 }
 
-/** Remove an object (used when rolling back a failed candidate insert). */
+/** Delete an object (used when rolling back a failed candidate insert). */
 export async function deleteObject(key: string): Promise<void> {
+  if (env.S3_SKIP) {
+    console.warn(`[S3_SKIP] Skipping delete: ${key}`);
+    return;
+  }
   await s3.send(new DeleteObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
 }

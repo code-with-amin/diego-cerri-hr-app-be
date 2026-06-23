@@ -12,7 +12,7 @@ export const loginLimiter = rateLimit({
 /** Throttle public candidate submissions to limit spam. */
 export const submissionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 30,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { message: 'Too many submissions, try again later.' } },
