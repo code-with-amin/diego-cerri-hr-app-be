@@ -61,8 +61,8 @@ export const candidateFormSchema = z.object({
   pastWork: requiredString,
   potentialWork: optionalString,
   yearsExperience: optionalNumber.refine(
-    (n) => n == null || (n >= 0 && n <= 60),
-    'yearsExperience out of range.',
+    (n) => n == null || (n >= 0 && n <= 100),
+    'yearsExperience must be between 0 and 100.',
   ),
 
   // Compensation & notes
