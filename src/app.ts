@@ -44,3 +44,11 @@ export function createApp(): Express {
 
   return app;
 }
+
+// Default export = a ready Express app instance. Vercel's Express framework
+// preset uses this module as the serverless function and invokes the default
+// export as the request handler (it never calls app.listen()). Local dev in
+// src/index.ts imports this same instance and calls listen() itself.
+const app = createApp();
+
+export default app;
