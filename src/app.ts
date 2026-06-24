@@ -20,10 +20,12 @@ export function createApp(): Express {
   );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  // pino-pretty is a devDependency and isn't available in serverless/production
+  // builds (e.g. Vercel), so only enable it for true local development.
+  const usePrettyLogs = env.NODE_ENV === 'development' && !process.env.VERCEL;
   app.use(
     pinoHttp({
-      transport:
-        env.NODE_ENV === 'development' ? { target: 'pino-pretty', options: { colorize: true } } : undefined,
+      transport: usePrettyLogs ? { target: 'pino-pretty', options: { colorize: true } } : undefined,
       // Don't log noisy health checks at info level.
       autoLogging: { ignore: (req) => req.url === '/api/health' },
     }),
