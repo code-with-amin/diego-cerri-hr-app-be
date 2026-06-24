@@ -70,6 +70,7 @@ export async function listCandidates(query: ListQuery) {
         phone: true,
         city: true,
         seniority: true,
+        hourlyRate: true,
         status: true,
         createdAt: true,
       },

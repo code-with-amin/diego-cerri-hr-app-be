@@ -13,4 +13,5 @@ notesRouter.post('/', asyncHandler(notesController.create));
 // Standalone: /api/notes/:noteId
 export const notesStandaloneRouter = Router();
 
+notesStandaloneRouter.patch('/:noteId', requireAdmin, asyncHandler(notesController.update));
 notesStandaloneRouter.delete('/:noteId', requireAdmin, asyncHandler(notesController.remove));

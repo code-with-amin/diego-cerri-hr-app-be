@@ -43,12 +43,19 @@ export type ResumeDisposition = 'inline' | 'attachment';
  * Generate a short-lived presigned GET URL for a stored resume.
  * `disposition=inline` opens in browser; `attachment` forces download.
  */
+// Stable public sample PDF served by W3C — used only when S3_SKIP=true.
+const SAMPLE_PDF_URL = 'https://pdfobject.com/pdf/sample.pdf';
+
 export async function getResumeUrl(
   key: string,
   filename: string,
   disposition: ResumeDisposition = 'inline',
   expiresInSeconds = 300,
 ): Promise<string> {
+  if (env.S3_SKIP) {
+    console.warn(`[S3_SKIP] Returning sample PDF instead of S3 object: ${key}`);
+    return SAMPLE_PDF_URL;
+  }
   const command = new GetObjectCommand({
     Bucket: env.S3_BUCKET,
     Key: key,

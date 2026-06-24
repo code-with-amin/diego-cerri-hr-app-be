@@ -32,6 +32,22 @@ export async function createNote(candidateId: string, adminId: string, body: str
   });
 }
 
+/** Update a note body — only its author may edit it. */
+export async function updateNote(noteId: string, adminId: string, body: string) {
+  const note = await prisma.note.findUnique({ where: { id: noteId } });
+  if (!note) {
+    throw ApiError.notFound('Note not found');
+  }
+  if (note.adminId !== adminId) {
+    throw ApiError.forbidden('You can only edit your own notes.');
+  }
+  return prisma.note.update({
+    where: { id: noteId },
+    data: { body },
+    include: { admin: { select: { id: true, email: true } } },
+  });
+}
+
 /** Delete a note — only its author may remove it. */
 export async function deleteNote(noteId: string, adminId: string) {
   const note = await prisma.note.findUnique({ where: { id: noteId } });
