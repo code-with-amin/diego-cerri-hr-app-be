@@ -42,6 +42,7 @@ export const candidateFormSchema = z.object({
   email: z.preprocess((v) => (v == null ? '' : String(v).trim()), z.string().email()),
   phone: requiredString,
   city: requiredString,
+  country: requiredString,
   linkedin: optionalString,
   birthDate: optionalDate,
 
@@ -83,6 +84,7 @@ export function mapFormToCandidate(input: CandidateFormInput) {
     email: input.email,
     phone: input.phone,
     city: input.city,
+    country: input.country,
     linkedinUrl: input.linkedin ?? null,
     birthDate: input.birthDate ?? null,
 

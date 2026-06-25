@@ -13,9 +13,8 @@ export async function create(req: Request, res: Response) {
     throw ApiError.badRequest('Resume file (resume) is required.');
   }
   const input = candidateFormSchema.parse(req.body);
-  const created = await candidateService.createCandidate(input, req.file);
-  const { resumeS3Key: _key, ...candidate } = created;
-  res.status(201).json({ candidate });
+  await candidateService.createCandidate(input, req.file);
+  res.status(201).json({ message: 'Application submitted successfully.' });
 }
 
 export async function list(req: Request, res: Response) {
