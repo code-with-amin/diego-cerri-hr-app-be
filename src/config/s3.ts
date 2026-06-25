@@ -9,6 +9,9 @@ import { env } from './env';
 
 export const s3 = new S3Client({
   region: env.AWS_REGION,
+  // Supabase Storage (and other S3-compatible services) require a custom
+  // endpoint plus path-style addressing; AWS S3 works with both unset.
+  ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT, forcePathStyle: true } : {}),
   credentials: {
     accessKeyId: env.AWS_ACCESS_KEY_ID,
     secretAccessKey: env.AWS_SECRET_ACCESS_KEY,

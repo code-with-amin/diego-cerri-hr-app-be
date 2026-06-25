@@ -17,6 +17,9 @@ const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),
+  // Custom S3 endpoint (e.g. Supabase Storage's S3-compatible API).
+  // Leave unset to target real AWS S3.
+  S3_ENDPOINT: z.string().url().optional(),
 
   CORS_ORIGIN: z.string().default('*'),
 
