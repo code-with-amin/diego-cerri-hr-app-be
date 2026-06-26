@@ -35,6 +35,21 @@ const optionalDate = z.preprocess(
   z.date().optional(),
 );
 
+/**
+ * Parse a filter bound into a UTC instant. A date-only value (YYYY-MM-DD) snaps
+ * to the start or end of that day in UTC, so `dateFrom`/`dateTo` are interpreted
+ * symmetrically regardless of the server's timezone. Full ISO strings pass through.
+ */
+const dateBoundary = (boundary: 'start' | 'end') =>
+  z.preprocess((val) => {
+    if (val === '' || val == null) return undefined;
+    const s = String(val);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return new Date(`${s}T${boundary === 'start' ? '00:00:00.000' : '23:59:59.999'}Z`);
+    }
+    return new Date(s);
+  }, z.date().optional());
+
 /** Raw form input (English keys from the HTML form), validated. */
 export const candidateFormSchema = z.object({
   // Contact
@@ -115,8 +130,8 @@ export function mapFormToCandidate(input: CandidateFormInput) {
 export const listQuerySchema = z.object({
   q: optionalString,
   status: z.nativeEnum(CandidateStatus).optional(),
-  dateFrom: optionalDate,
-  dateTo: optionalDate,
+  dateFrom: dateBoundary('start'),
+  dateTo: dateBoundary('end'),
   sort: z.enum(['asc', 'desc']).default('desc'),
   page: z.preprocess((v) => (v == null ? 1 : Number(v)), z.number().int().min(1)).default(1),
   limit: z
