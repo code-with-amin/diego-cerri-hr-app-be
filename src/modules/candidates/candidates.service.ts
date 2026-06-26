@@ -69,6 +69,7 @@ export async function listCandidates(query: ListQuery) {
         email: true,
         phone: true,
         city: true,
+        state: true,
         seniority: true,
         hourlyRate: true,
         status: true,
@@ -105,6 +106,19 @@ export async function updateStatus(id: string, status: CandidateStatus) {
     data: { status },
     select: { id: true, status: true, updatedAt: true },
   });
+}
+
+/**
+ * Permanently delete a candidate and its related notes (cascade).
+ * The resume object in S3 is intentionally left in place.
+ */
+export async function deleteCandidate(id: string) {
+  const exists = await prisma.candidate.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) {
+    throw ApiError.notFound('Candidate not found');
+  }
+  await prisma.candidate.delete({ where: { id } });
+  return { id };
 }
 
 /** Presigned URL for viewing/downloading the resume. */

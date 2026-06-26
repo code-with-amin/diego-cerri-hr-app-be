@@ -30,6 +30,7 @@ candidatesRouter.use(requireAdmin);
 candidatesRouter.get('/', asyncHandler(candidateController.list));
 candidatesRouter.get('/:id', asyncHandler(candidateController.getById));
 candidatesRouter.patch('/:id/status', asyncHandler(candidateController.updateStatus));
+candidatesRouter.delete('/:id', asyncHandler(candidateController.remove));
 candidatesRouter.get('/:id/resume', asyncHandler(candidateController.getResume));
 
 // Nested private notes: /api/candidates/:id/notes

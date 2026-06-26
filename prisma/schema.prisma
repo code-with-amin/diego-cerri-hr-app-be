@@ -41,6 +41,7 @@ model Candidate {
   email       String    @map("email") // email
   phone       String    @map("phone") // telefone
   city        String    @map("city") // cidade
+  state       String?   @map("state") // estado / state
   country     String?   @map("country") // país / country
   linkedinUrl String?   @map("linkedin_url") // linkedin
   birthDate   DateTime? @map("birth_date") @db.Date // nascimento

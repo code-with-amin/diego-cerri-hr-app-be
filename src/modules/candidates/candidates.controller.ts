@@ -34,6 +34,11 @@ export async function updateStatus(req: Request, res: Response) {
   res.json({ candidate });
 }
 
+export async function remove(req: Request, res: Response) {
+  const result = await candidateService.deleteCandidate(req.params.id);
+  res.json({ deleted: true, ...result });
+}
+
 export async function getResume(req: Request, res: Response) {
   const { disposition } = resumeQuerySchema.parse(req.query);
   const result = await candidateService.getCandidateResumeUrl(req.params.id, disposition);
