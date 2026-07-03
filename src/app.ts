@@ -6,6 +6,9 @@ import { corsOrigins, env } from './config/env';
 import { authRouter } from './modules/auth/auth.routes';
 import { candidatesRouter } from './modules/candidates/candidates.routes';
 import { notesStandaloneRouter } from './modules/notes/notes.routes';
+import { employeeAuthRouter } from './modules/employee-auth/employee-auth.routes';
+import { trackerRouter } from './modules/tracker/tracker.routes';
+import { employeesRouter } from './modules/employees/employees.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 export function createApp(): Express {
@@ -38,6 +41,9 @@ export function createApp(): Express {
   app.use('/api/auth', authRouter);
   app.use('/api/candidates', candidatesRouter);
   app.use('/api/notes', notesStandaloneRouter);
+  app.use('/api/employee/auth', employeeAuthRouter);
+  app.use('/api/employee/tracker', trackerRouter);
+  app.use('/api/employees', employeesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

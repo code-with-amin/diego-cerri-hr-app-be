@@ -3,6 +3,8 @@ import { Prisma, CandidateStatus } from '@prisma/client';
 import { prisma } from '../../config/db';
 import { uploadObject, getResumeUrl, deleteObject, ResumeDisposition } from '../../config/s3';
 import { ApiError } from '../../utils/ApiError';
+import { generatePassword, hashPassword } from '../../utils/password';
+import { sendApprovalPassword } from '../mail/mail.service';
 import { CandidateFormInput, ListQuery, mapFormToCandidate } from './candidates.schema';
 
 interface ResumeFile {
@@ -97,15 +99,86 @@ export async function getCandidate(id: string) {
 }
 
 export async function updateStatus(id: string, status: CandidateStatus) {
-  const exists = await prisma.candidate.findUnique({ where: { id }, select: { id: true } });
-  if (!exists) {
+  const candidate = await prisma.candidate.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, hourlyRate: true },
+  });
+  if (!candidate) {
     throw ApiError.notFound('Candidate not found');
   }
-  return prisma.candidate.update({
+
+  const updated = await prisma.candidate.update({
     where: { id },
     data: { status },
     select: { id: true, status: true, updatedAt: true },
   });
+
+  // First-time approval provisions an employee account (idempotent).
+  if (status === CandidateStatus.APPROVED) {
+    await provisionEmployeeFromCandidate(candidate);
+  }
+
+  return updated;
+}
+
+/**
+ * Create an employee User for a newly-approved candidate, once.
+ * - No-op if this candidate already has a linked user (idempotent) or if the
+ *   candidate's email is already taken by another account.
+ * - Generates a random password, stores its hash, and emails the plaintext.
+ * A mail failure is logged but does not roll back the created account (HR can
+ * re-set the password later from the Employees section).
+ */
+async function provisionEmployeeFromCandidate(candidate: {
+  id: string;
+  name: string;
+  email: string;
+  hourlyRate: Prisma.Decimal;
+}) {
+  const existing = await prisma.user.findUnique({
+    where: { candidateId: candidate.id },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  const emailTaken = await prisma.user.findUnique({
+    where: { email: candidate.email },
+    select: { id: true },
+  });
+  if (emailTaken) {
+    console.warn(
+      `[approval] Skipped employee provisioning for candidate ${candidate.id}: ` +
+        `email ${candidate.email} is already in use by another account.`,
+    );
+    return;
+  }
+
+  const employeeRole = await prisma.role.findUnique({ where: { name: 'employee' } });
+  if (!employeeRole) {
+    throw new ApiError(500, 'Employee role is not seeded');
+  }
+
+  const password = generatePassword();
+  const passwordHash = await hashPassword(password);
+
+  await prisma.user.create({
+    data: {
+      email: candidate.email,
+      name: candidate.name,
+      passwordHash,
+      passwordSetAt: new Date(),
+      roleId: employeeRole.id,
+      candidateId: candidate.id,
+      hourlyRate: candidate.hourlyRate,
+      enabled: true,
+    },
+  });
+
+  try {
+    await sendApprovalPassword(candidate.email, candidate.name, password);
+  } catch (err) {
+    console.error(`[approval] Failed to email password to ${candidate.email}:`, err);
+  }
 }
 
 /**
@@ -117,6 +190,19 @@ export async function deleteCandidate(id: string) {
   if (!exists) {
     throw ApiError.notFound('Candidate not found');
   }
+
+  // A candidate provisioned as an employee cannot be deleted — their account
+  // (and any tracked time) would be orphaned. Disable the employee instead.
+  const linkedEmployee = await prisma.user.findUnique({
+    where: { candidateId: id },
+    select: { id: true },
+  });
+  if (linkedEmployee) {
+    throw ApiError.badRequest(
+      'This candidate has an employee account and cannot be deleted. Disable the employee instead.',
+    );
+  }
+
   await prisma.candidate.delete({ where: { id } });
   return { id };
 }

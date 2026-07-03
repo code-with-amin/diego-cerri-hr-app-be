@@ -25,6 +25,23 @@ const envSchema = z.object({
 
   MAX_UPLOAD_MB: z.coerce.number().default(10),
 
+  // ── Email / SMTP ────────────────────────────────────────────
+  // Used to email employees their generated / reset passwords.
+  SMTP_HOST: z.string().default('localhost'),
+  SMTP_PORT: z.coerce.number().default(1025),
+  // Honored as-is, but the mailer forces TLS only for port 465 so a local
+  // Mailpit on 1025 (plain SMTP) works even if this is left "true".
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('HR App <no-reply@kpi.local>'),
+
+  // Base URL of the employee portal (front-end), used to build reset links.
+  APP_EMPLOYEE_URL: z.string().url().default('http://localhost:3000'),
+
   // Set to true in development to skip real S3 uploads.
   S3_SKIP: z
     .string()
