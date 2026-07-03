@@ -4,12 +4,15 @@ import { signToken } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
 import { LoginInput } from './auth.schema';
 
+/** Admin login — authenticates a User holding the `admin` role. */
 export async function login({ email, password }: LoginInput) {
-  const admin = await prisma.admin.findUnique({ where: { email } });
+  const admin = await prisma.user.findUnique({
+    where: { email },
+    include: { role: true },
+  });
 
-  // Compare even when the admin is missing to reduce timing leakage is overkill
-  // here; a clear 401 is fine for a single-admin system.
-  if (!admin) {
+  // A clear 401 is fine for the admin login; require the admin role + a password.
+  if (!admin || admin.role.name !== 'admin' || !admin.passwordHash) {
     throw ApiError.unauthorized('Invalid credentials');
   }
 
@@ -18,12 +21,12 @@ export async function login({ email, password }: LoginInput) {
     throw ApiError.unauthorized('Invalid credentials');
   }
 
-  const token = signToken({ sub: admin.id, email: admin.email });
+  const token = signToken({ sub: admin.id, email: admin.email, role: admin.role.name });
   return { token, admin: { id: admin.id, email: admin.email } };
 }
 
 export async function getAdminById(id: string) {
-  const admin = await prisma.admin.findUnique({
+  const admin = await prisma.user.findUnique({
     where: { id },
     select: { id: true, email: true, createdAt: true },
   });

@@ -14,15 +14,27 @@ async function main() {
     throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD must be set to seed the admin account.');
   }
 
+  // Seed the two base roles. Granular permissions are a future phase.
+  const [adminRole] = await Promise.all([
+    prisma.role.upsert({ where: { name: 'admin' }, update: {}, create: { name: 'admin' } }),
+    prisma.role.upsert({ where: { name: 'employee' }, update: {}, create: { name: 'employee' } }),
+  ]);
+
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  const admin = await prisma.admin.upsert({
+  const admin = await prisma.user.upsert({
     where: { email },
-    update: { passwordHash },
-    create: { email, passwordHash },
+    update: { passwordHash, roleId: adminRole.id },
+    create: {
+      email,
+      passwordHash,
+      name: 'HR Manager',
+      roleId: adminRole.id,
+      passwordSetAt: new Date(),
+    },
   });
 
-  console.log(`Seeded admin account: ${admin.email}`);
+  console.log(`Seeded roles (admin, employee) and admin account: ${admin.email}`);
 }
 
 main()

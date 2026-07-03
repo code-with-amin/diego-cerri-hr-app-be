@@ -35,6 +35,21 @@ const optionalDate = z.preprocess(
   z.date().optional(),
 );
 
+/**
+ * Parse a filter bound into a UTC instant. A date-only value (YYYY-MM-DD) snaps
+ * to the start or end of that day in UTC, so `dateFrom`/`dateTo` are interpreted
+ * symmetrically regardless of the server's timezone. Full ISO strings pass through.
+ */
+const dateBoundary = (boundary: 'start' | 'end') =>
+  z.preprocess((val) => {
+    if (val === '' || val == null) return undefined;
+    const s = String(val);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return new Date(`${s}T${boundary === 'start' ? '00:00:00.000' : '23:59:59.999'}Z`);
+    }
+    return new Date(s);
+  }, z.date().optional());
+
 /** Raw form input (English keys from the HTML form), validated. */
 export const candidateFormSchema = z.object({
   // Contact
@@ -42,6 +57,8 @@ export const candidateFormSchema = z.object({
   email: z.preprocess((v) => (v == null ? '' : String(v).trim()), z.string().email()),
   phone: requiredString,
   city: requiredString,
+  state: optionalString,
+  country: requiredString,
   linkedin: optionalString,
   birthDate: optionalDate,
 
@@ -61,8 +78,8 @@ export const candidateFormSchema = z.object({
   pastWork: requiredString,
   potentialWork: optionalString,
   yearsExperience: optionalNumber.refine(
-    (n) => n == null || (n >= 0 && n <= 60),
-    'yearsExperience out of range.',
+    (n) => n == null || (n >= 0 && n <= 100),
+    'yearsExperience must be between 0 and 100.',
   ),
 
   // Compensation & notes
@@ -83,6 +100,8 @@ export function mapFormToCandidate(input: CandidateFormInput) {
     email: input.email,
     phone: input.phone,
     city: input.city,
+    state: input.state ?? null,
+    country: input.country,
     linkedinUrl: input.linkedin ?? null,
     birthDate: input.birthDate ?? null,
 
@@ -111,8 +130,8 @@ export function mapFormToCandidate(input: CandidateFormInput) {
 export const listQuerySchema = z.object({
   q: optionalString,
   status: z.nativeEnum(CandidateStatus).optional(),
-  dateFrom: optionalDate,
-  dateTo: optionalDate,
+  dateFrom: dateBoundary('start'),
+  dateTo: dateBoundary('end'),
   sort: z.enum(['asc', 'desc']).default('desc'),
   page: z.preprocess((v) => (v == null ? 1 : Number(v)), z.number().int().min(1)).default(1),
   limit: z

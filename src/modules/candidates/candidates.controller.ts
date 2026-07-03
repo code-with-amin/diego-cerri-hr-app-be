@@ -13,9 +13,8 @@ export async function create(req: Request, res: Response) {
     throw ApiError.badRequest('Resume file (resume) is required.');
   }
   const input = candidateFormSchema.parse(req.body);
-  const created = await candidateService.createCandidate(input, req.file);
-  const { resumeS3Key: _key, ...candidate } = created;
-  res.status(201).json({ candidate });
+  await candidateService.createCandidate(input, req.file);
+  res.status(201).json({ message: 'Application submitted successfully.' });
 }
 
 export async function list(req: Request, res: Response) {
@@ -33,6 +32,11 @@ export async function updateStatus(req: Request, res: Response) {
   const { status } = updateStatusSchema.parse(req.body);
   const candidate = await candidateService.updateStatus(req.params.id, status);
   res.json({ candidate });
+}
+
+export async function remove(req: Request, res: Response) {
+  const result = await candidateService.deleteCandidate(req.params.id);
+  res.json({ deleted: true, ...result });
 }
 
 export async function getResume(req: Request, res: Response) {

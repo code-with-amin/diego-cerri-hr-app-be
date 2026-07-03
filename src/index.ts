@@ -1,8 +1,6 @@
-import { createApp } from './app';
+import app from './app';
 import { env } from './config/env';
 import { prisma } from './config/db';
-
-const app = createApp();
 
 const server = app.listen(env.PORT, () => {
   // eslint-disable-next-line no-console

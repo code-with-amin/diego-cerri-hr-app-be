@@ -2,12 +2,14 @@
 // PostgreSQL database. Run `npm run prisma:migrate` to apply.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum CandidateStatus {
@@ -17,16 +19,125 @@ enum CandidateStatus {
   REJECTED
 }
 
-/// Single HR manager account (seeded). Could grow to multi-admin later.
-model Admin {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
+enum TrackerStatus {
+  running
+  paused
+}
 
-  notes Note[]
+enum TimeEntrySource {
+  TIMER
+  MANUAL
+}
 
-  @@map("admins")
+/// Role drives RBAC (seeded: admin, employee). Granular per-permission control
+/// is deferred to a future admin-configurable phase — for now the role name is
+/// the authorization unit.
+model Role {
+  id   String @id @default(uuid())
+  name String @unique
+
+  users User[]
+
+  @@map("roles")
+}
+
+/// Auth-bearing account for both admins and employees.
+/// - Admins: candidateId null, passwordHash always set.
+/// - Employees: candidateId set (links back to the originating candidate/form),
+///   passwordHash set on creation, hourlyRate seeded from the candidate.
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  passwordHash String? @map("password_hash")
+  name         String?
+
+  roleId String @map("role_id")
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  // Employees link back to the candidate they were provisioned from.
+  candidateId String?    @unique @map("candidate_id")
+  candidate   Candidate? @relation(fields: [candidateId], references: [id])
+
+  // HR-set hourly rate, used to compute tracked cost. Seeded from candidate.hourlyRate.
+  hourlyRate Decimal? @map("hourly_rate") @db.Decimal(12, 2)
+
+  // Admin enable/disable switch (default enabled).
+  enabled Boolean @default(true)
+
+  // Lifecycle / auth
+  passwordSetAt       DateTime? @map("password_set_at")
+  resetTokenHash      String?   @map("reset_token_hash")
+  resetTokenExpiresAt DateTime? @map("reset_token_expires_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  timeEntries    TimeEntry[]
+  trackerSession TrackerSession?
+  notesAuthored  Note[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+/// Live, in-progress tracker session — at most one active per user.
+model TrackerSession {
+  id     String        @id @default(uuid())
+  userId String        @unique @map("user_id")
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status TrackerStatus @default(running)
+
+  startedAt             DateTime  @map("started_at")
+  totalBreakMs          Int       @default(0) @map("total_break_ms")
+  currentBreakStartedAt DateTime? @map("current_break_started_at")
+  breakCount            Int       @default(0) @map("break_count")
+
+  // Captured form context (mirrors the tracker form).
+  project      String
+  client       String?
+  activityKey  String   @map("activity_key")
+  location     String?
+  entryType    String?  @map("entry_type")
+  observations String?
+
+  // Snapshot of the user's rate at session start.
+  rateSnapshot Decimal? @map("rate_snapshot") @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tracker_sessions")
+}
+
+/// A completed time entry — either stopped from the live timer (TIMER) or
+/// logged retroactively/manually (MANUAL). Rate & cost are snapshotted at
+/// creation and never rewritten when HR later changes User.hourlyRate.
+model TimeEntry {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  project     String
+  activityKey String  @map("activity_key")
+  client      String?
+  location    String?
+  entryType   String? @map("entry_type")
+
+  startedAt DateTime @map("started_at")
+  endedAt   DateTime @map("ended_at")
+  breakMs   Int      @default(0) @map("break_ms")
+  netMs     Int      @map("net_ms")
+
+  rate Decimal @db.Decimal(12, 2)
+  cost Decimal @db.Decimal(12, 2)
+
+  notes  String?
+  source TimeEntrySource @default(TIMER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, startedAt])
+  @@map("time_entries")
 }
 
 /// A candidate submission from the public "Trabalhe Conosco" form.
@@ -39,6 +150,8 @@ model Candidate {
   email       String    @map("email") // email
   phone       String    @map("phone") // telefone
   city        String    @map("city") // cidade
+  state       String?   @map("state") // estado / state
+  country     String?   @map("country") // país / country
   linkedinUrl String?   @map("linkedin_url") // linkedin
   birthDate   DateTime? @map("birth_date") @db.Date // nascimento
 
@@ -80,21 +193,26 @@ model Candidate {
 
   notes Note[]
 
+  // The employee account provisioned from this candidate on approval (if any).
+  user User?
+
   @@index([status])
   @@index([createdAt])
   @@map("candidates")
 }
 
-/// Private internal HR note attached to a candidate. Visible only to admins.
+/// Private internal HR note attached to a candidate. Authored by an admin User.
+/// Table/column names are preserved (`notes`, `admin_id`) so the notes API and
+/// its stored data are unchanged; the FK now points at User instead of Admin.
 model Note {
   id          String   @id @default(uuid())
   candidateId String   @map("candidate_id")
-  adminId     String   @map("admin_id")
+  authorId    String   @map("admin_id")
   body        String   @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  admin     Admin     @relation(fields: [adminId], references: [id])
+  author    User      @relation(fields: [authorId], references: [id])
 
   @@index([candidateId])
   @@map("notes")
