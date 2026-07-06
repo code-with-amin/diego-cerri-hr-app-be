@@ -98,6 +98,18 @@ export async function getCandidate(id: string) {
   return { ...rest, resumeUrl };
 }
 
+/**
+ * Result of a status change. `notification` is populated only when a first-time
+ * approval just provisioned an employee account, so the admin UI can confirm
+ * (or warn about) the credentials email. It is null for every other transition,
+ * including re-approving a candidate that already has an account.
+ */
+export interface StatusNotification {
+  type: 'approval';
+  email: string;
+  emailed: boolean;
+}
+
 export async function updateStatus(id: string, status: CandidateStatus) {
   const candidate = await prisma.candidate.findUnique({
     where: { id },
@@ -114,11 +126,15 @@ export async function updateStatus(id: string, status: CandidateStatus) {
   });
 
   // First-time approval provisions an employee account (idempotent).
+  let notification: StatusNotification | null = null;
   if (status === CandidateStatus.APPROVED) {
-    await provisionEmployeeFromCandidate(candidate);
+    const result = await provisionEmployeeFromCandidate(candidate);
+    if (result.provisioned) {
+      notification = { type: 'approval', email: candidate.email, emailed: result.emailed };
+    }
   }
 
-  return updated;
+  return { ...updated, notification };
 }
 
 /**
@@ -129,17 +145,21 @@ export async function updateStatus(id: string, status: CandidateStatus) {
  * A mail failure is logged but does not roll back the created account (HR can
  * re-set the password later from the Employees section).
  */
+type ProvisionResult =
+  | { provisioned: true; emailed: boolean }
+  | { provisioned: false; reason: 'already_provisioned' | 'email_taken' };
+
 async function provisionEmployeeFromCandidate(candidate: {
   id: string;
   name: string;
   email: string;
   hourlyRate: Prisma.Decimal;
-}) {
+}): Promise<ProvisionResult> {
   const existing = await prisma.user.findUnique({
     where: { candidateId: candidate.id },
     select: { id: true },
   });
-  if (existing) return;
+  if (existing) return { provisioned: false, reason: 'already_provisioned' };
 
   const emailTaken = await prisma.user.findUnique({
     where: { email: candidate.email },
@@ -150,7 +170,7 @@ async function provisionEmployeeFromCandidate(candidate: {
       `[approval] Skipped employee provisioning for candidate ${candidate.id}: ` +
         `email ${candidate.email} is already in use by another account.`,
     );
-    return;
+    return { provisioned: false, reason: 'email_taken' };
   }
 
   const employeeRole = await prisma.role.findUnique({ where: { name: 'employee' } });
@@ -176,8 +196,10 @@ async function provisionEmployeeFromCandidate(candidate: {
 
   try {
     await sendApprovalPassword(candidate.email, candidate.name, password);
+    return { provisioned: true, emailed: true };
   } catch (err) {
     console.error(`[approval] Failed to email password to ${candidate.email}:`, err);
+    return { provisioned: true, emailed: false };
   }
 }
 
