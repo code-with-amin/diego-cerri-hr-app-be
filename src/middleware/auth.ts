@@ -9,6 +9,7 @@ export interface AuthPayload {
   sub: string; // user id
   email: string;
   role: string; // role name (admin | employee)
+  iat?: number; // issued-at (seconds) — set by jwt.sign, used for password-change invalidation
 }
 
 /** The authenticated user loaded from the DB for the current request. */
@@ -69,6 +70,15 @@ export function requireRole(roleName: 'admin' | 'employee') {
 
     if (!user || !user.enabled) {
       throw ApiError.unauthorized('Account is not active');
+    }
+    // Invalidate tokens issued before the password was last set: an admin
+    // changing an employee's password (or a self reset) logs out old sessions.
+    if (
+      user.passwordSetAt &&
+      decoded.iat !== undefined &&
+      Math.floor(user.passwordSetAt.getTime() / 1000) > decoded.iat
+    ) {
+      throw ApiError.unauthorized('Session expired, please log in again');
     }
     if (user.role.name !== roleName) {
       throw ApiError.forbidden('Insufficient permissions');

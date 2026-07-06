@@ -101,13 +101,15 @@ export async function setPassword(id: string, input: SetPasswordInput) {
     },
   });
 
+  let emailed = false;
   try {
     await sendAdminSetPassword(employee.email, employee.name, input.password);
+    emailed = true;
   } catch (err) {
     console.error(`[employees] Failed to email new password to ${employee.email}:`, err);
   }
 
-  return { id };
+  return { id, emailed, email: employee.email };
 }
 
 export async function getTimesheet(id: string, query: TimesheetQuery) {

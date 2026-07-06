@@ -30,8 +30,11 @@ export async function getById(req: Request, res: Response) {
 
 export async function updateStatus(req: Request, res: Response) {
   const { status } = updateStatusSchema.parse(req.body);
-  const candidate = await candidateService.updateStatus(req.params.id, status);
-  res.json({ candidate });
+  const { notification, ...candidate } = await candidateService.updateStatus(
+    req.params.id,
+    status,
+  );
+  res.json({ candidate, notification });
 }
 
 export async function remove(req: Request, res: Response) {
