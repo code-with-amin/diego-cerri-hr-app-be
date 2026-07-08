@@ -10,5 +10,6 @@ employeesRouter.use(requireAdmin);
 
 employeesRouter.get('/', asyncHandler(employeesController.list));
 employeesRouter.patch('/:id', asyncHandler(employeesController.update));
+employeesRouter.delete('/:id', asyncHandler(employeesController.remove));
 employeesRouter.post('/:id/password', asyncHandler(employeesController.setPassword));
 employeesRouter.get('/:id/timesheet', asyncHandler(employeesController.timesheet));
