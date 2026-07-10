@@ -20,13 +20,19 @@ const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 export async function login({ email, password }: EmployeeLoginInput) {
   const user = await prisma.user.findUnique({ where: { email }, include: { role: true } });
 
-  if (!user || user.role.name !== 'employee' || !user.enabled || !user.passwordHash) {
+  if (!user || user.role.name !== 'employee' || !user.passwordHash) {
     throw ApiError.unauthorized('Invalid credentials');
   }
 
   const ok = await comparePassword(password, user.passwordHash);
   if (!ok) {
     throw ApiError.unauthorized('Invalid credentials');
+  }
+
+  // Only reveal a disabled account once the credentials are proven valid — this
+  // avoids leaking account existence to someone guessing emails/passwords.
+  if (!user.enabled) {
+    throw ApiError.forbidden('Your account has been disabled. Please contact your administrator.');
   }
 
   const token = signToken({ sub: user.id, email: user.email, role: user.role.name });
