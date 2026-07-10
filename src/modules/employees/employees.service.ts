@@ -86,6 +86,49 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput) {
   return prisma.user.update({ where: { id }, data, select: employeeSelect });
 }
 
+/**
+ * Permanently delete an employee account.
+ *
+ * Blocked when the employee has any time entry that ended within the last 12
+ * months (protects recent payroll/reporting data) or currently has an active
+ * tracking session. Deleting the user cascades their older time entries and any
+ * session; the originating candidate row is left intact and becomes deletable
+ * again through the candidate flow afterwards.
+ */
+export async function deleteEmployee(id: string) {
+  await getEmployeeOrThrow(id);
+
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+
+  const recentEntry = await prisma.timeEntry.findFirst({
+    where: { userId: id, endedAt: { gte: cutoff } },
+    select: { id: true },
+  });
+  if (recentEntry) {
+    throw new ApiError(
+      409,
+      'This employee has recorded hours in the last 12 months and cannot be deleted. Disable the employee instead.',
+      { code: 'EMPLOYEE_HAS_RECENT_HOURS' },
+    );
+  }
+
+  const activeSession = await prisma.trackerSession.findUnique({
+    where: { userId: id },
+    select: { id: true },
+  });
+  if (activeSession) {
+    throw new ApiError(
+      409,
+      'This employee has an active tracking session and cannot be deleted. Ask them to stop the timer, or disable the employee instead.',
+      { code: 'EMPLOYEE_HAS_ACTIVE_SESSION' },
+    );
+  }
+
+  await prisma.user.delete({ where: { id } });
+  return { id };
+}
+
 export async function setPassword(id: string, input: SetPasswordInput) {
   const employee = await getEmployeeOrThrow(id);
 
