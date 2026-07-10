@@ -94,9 +94,9 @@ model TrackerSession {
   // Captured form context (mirrors the tracker form).
   project      String
   client       String?
-  activityKey  String   @map("activity_key")
+  activityKey  String  @map("activity_key")
   location     String?
-  entryType    String?  @map("entry_type")
+  entryType    String? @map("entry_type")
   observations String?
 
   // Snapshot of the user's rate at session start.
@@ -140,6 +140,66 @@ model TimeEntry {
   @@map("time_entries")
 }
 
+/// Human-readable label for each activity_key, seeded from the frontend i18n
+/// (PT-BR). Referenced by the reporting trigger to denormalize a readable
+/// activity name onto every report row. Add a row when a new activity_key is
+/// introduced; unmapped keys fall back to the raw key in the report table.
+model ActivityLabel {
+  activityKey String @id @map("activity_key")
+  label       String
+
+  @@map("activity_labels")
+}
+
+/// Denormalized, flat reporting table — one row per time entry — built for
+/// Power BI (Import mode over the direct Postgres connection). It is maintained
+/// entirely by the `sync_time_entries_report` trigger on `time_entries`; the
+/// application NEVER writes to it. Employee name/email are snapshotted at entry
+/// time. Durations are pre-computed as decimal hours; date parts are derived at
+/// the America/Sao_Paulo business timezone so day/month boundaries match the app.
+model TimeEntryReport {
+  entryId       String  @id @map("entry_id")
+  userId        String  @map("user_id")
+  employeeName  String? @map("employee_name")
+  employeeEmail String? @map("employee_email")
+
+  project       String
+  client        String?
+  location      String?
+  entryType     String? @map("entry_type")
+  source        String
+  activityKey   String  @map("activity_key")
+  activityLabel String  @map("activity_label")
+
+  startedAt   DateTime @map("started_at")
+  endedAt     DateTime @map("ended_at")
+  workDate    DateTime @map("work_date") @db.Date
+  year        Int
+  quarter     Int
+  month       Int
+  monthName   String   @map("month_name")
+  isoWeek     Int      @map("iso_week")
+  weekday     Int
+  weekdayName String   @map("weekday_name")
+
+  netHours   Decimal @map("net_hours") @db.Decimal(12, 4)
+  breakHours Decimal @map("break_hours") @db.Decimal(12, 4)
+  grossHours Decimal @map("gross_hours") @db.Decimal(12, 4)
+  rate       Decimal @db.Decimal(12, 2)
+  cost       Decimal @db.Decimal(12, 2)
+  entryCount Int     @default(1) @map("entry_count")
+
+  createdAt DateTime @map("created_at")
+  updatedAt DateTime @map("updated_at")
+  syncedAt  DateTime @map("synced_at")
+
+  @@index([workDate])
+  @@index([userId])
+  @@index([project])
+  @@index([activityKey])
+  @@map("time_entries_report")
+}
+
 /// A candidate submission from the public "Trabalhe Conosco" form.
 /// Form field keys (Portuguese) are mapped to these columns in candidates.schema.ts.
 model Candidate {
@@ -156,10 +216,10 @@ model Candidate {
   birthDate   DateTime? @map("birth_date") @db.Date // nascimento
 
   // Resume — Currículo (PDF) stored in S3
-  resumeS3Key       String  @map("resume_s3_key")
-  resumeFilename    String  @map("resume_filename")
-  resumeContentType String  @map("resume_content_type")
-  resumeSize        Int     @map("resume_size")
+  resumeS3Key       String @map("resume_s3_key")
+  resumeFilename    String @map("resume_filename")
+  resumeContentType String @map("resume_content_type")
+  resumeSize        Int    @map("resume_size")
 
   // Modality & availability — Modalidade e Disponibilidade
   employmentTypes    String[] @map("employment_types") // modalidade
